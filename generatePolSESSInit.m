@@ -14,40 +14,40 @@
 % paths to speech corpora
 
 % the absolute path to downloaded emu corpus: https://mowa.clarin-pl.eu/korpusy
-emuDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\clarin_emu';
+emuDBPath = 'C:\datasety\clarin_emu';
 
 % the path to downloaded multilingual LibriSpeech (only PL part): https://www.openslr.org/94/
-libriSpeechPLDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\MultilingualLibriSpeech_mls_polish\mls_polish';
+libriSpeechPLDBPath = 'C:\datasety\mls_polish';
 
 % paths to environmental scenes corpora
 
 % the path to WHAM  http://wham.whisper.ai/
-whamNoiseDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\WHAM\wham_noise\wham_noise';
+whamNoiseDBPath = 'C:\datasety\wham_noise\wham_noise';
 
 % the path to TUT 2027: https://zenodo.org/records/400515
-tutDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\TUT-acoustic-scenes-2017';
+tutDBPath = 'C:\datasety\TUT-acoustic-scenes-2017';
 
 % the path to TAU-urban-acoustic-scenes
 % please reorganize the data so that all of the recordings are stored in single audio
 % directory!
-tauDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\TAU-urban-acoustic-scenes';
+tauDBPath = 'C:\datasety\TAU-urban-acoustic-scenes-2019-development';
 
 % paths to sound events corpora
 
 % the path to ESC50 events https://github.com/karolpiczak/ESC-50
-esc50eDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\ESC-50-master\ESC-50-master\audio';
+esc50eDBPath = 'C:\datasety\ESC-50-master\audio';
 
 % the path to FSD50K events https://zenodo.org/records/4060432
-fsd50kDBPath = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\FSD50K';
+fsd50kDBPath = 'C:\datasety\FSD50K';
 
 %% define other important information about the corpus
 
 % the output where the generated corpus will be stored
-outputDir = 'C:\Users\mklec\ExperymentyMOWA\BAZY\MOWA\PolSMSE';
+outputDir = 'C:\datasety\PolSESS_MD';
 
 % the name of the created corpus - it will be the name of the folder which
 % stores the corpus
-theNameofDB = 'PolSESS_TEMP';
+theNameofDB = 'PolSESS';
 
 % the desired frequency of output files. Can be 8000 or 16000Hz
 outputFreq = 8000;
@@ -58,14 +58,19 @@ outputFreq = 8000;
 mixLength = 4;
 
 % declare how many files you want to generate for the current subset
-howManyToGenerate = 1000;
+howManyToGenerate = 5;
 
 % type one of these: test | val | train
 % it denotes the subset you currently want to generate
-subset = 'train';
+subset = 'val';
 
 % the speech to speech ratio range when mixing two speakers
 SSRrange = [-5 5];
+
+% range of how much the scene will be quieter than the speech mix (in decibels)
+% first value - the lowest volume of scene in relation to speech mix
+% second value - the highest volume of scene in relation to speech mix
+sceneToSpeechRange = [-14, 0];
 
 %% here are some other constants that should not rather be changed
 
@@ -346,6 +351,38 @@ while id <= howManyToGenerate
         disp('CLIPPING continue...');
         continue
     end
+
+    % now the scene volume will be adjusted to be quieter than the speech mix.
+    % the range of possible differences in volume between scene and speech mix is
+    % defined in sceneToSpeechRange variable. i.e. if sceneToSpeechRange = [-14,0]
+    % then the scene will be between 0 and 14 dB quieter than the speech mix.
+
+    % calculate RMS of scene and speechMix 
+    speechRMS = sqrt(mean(speechMix.^2));
+    sceneRMS = sqrt(mean(yScene.^2));
+
+    % Desired offset (first value in sceneToSpeechRange indicates how much 
+    % the scene will be quieter than the speech mix)
+    sceneTargetOffsetDB = sceneToSpeechRange(1);
+
+    % randomize within the range
+    sceneRandomDB = (sceneToSpeechRange(2) - sceneToSpeechRange(1))*rand();
+
+    % Total desired offset
+    totalSceneOffsetDB = sceneTargetOffsetDB + sceneRandomDB;
+
+    % Calculate target scene RMS
+    targetSceneRMS = speechRMS * 10^(totalSceneOffsetDB/20);
+
+    % Calculate gain
+    if sceneRMS > 0
+        sceneGain = targetSceneRMS / sceneRMS;
+    else
+        sceneGain = 1; % avoid division by zero
+    end
+
+    % Apply gain to scene
+    yScene = yScene * sceneGain;
 
     % next, check if the scene class is indoor or not. If indoor than apply
     % reverberation to the speech and events. In such a case the speech and
