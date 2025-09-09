@@ -600,3 +600,6 @@ end
 
 %% save the final created metadata file to disc
 save(['corpus_' theNameofDB '_' subset '_final.mat'],'corpus');
+
+% also save the metadata as csv file
+writetable(corpus, ['corpus_' theNameofDB '_' subset '_final.csv']);
